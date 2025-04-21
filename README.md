@@ -5,4 +5,4 @@
 
 
 ### Command to run spark job
-```docker run --rm -it --gpus all -v $(pwd):/app spark-pytorch spark-cnn-runtime /app/<SPARK-JOB FILE PATH>```
+```docker run --rm -it --gpus all -v $(pwd):/app spark-cnn-runtime spark-cnn-runtime /app/<SPARK-JOB FILE PATH>```

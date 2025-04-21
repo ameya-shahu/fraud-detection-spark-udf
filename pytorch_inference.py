@@ -1,9 +1,9 @@
 import os
 import time
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, FloatType
-
-from conf import pytorch_model_state_file, images_path_csv, images_dir, model_lable_map
+from pyspark.sql.types import StructType, StructField, StringType, FloatType, IntegerType
+from pyspark.sql.functions import rand
+from conf import pytorch_model_state_file, images_path_csv, images_dir, model_lable_map, predication_detail_query, confusion_matrix_query
 
 
 def predict_image(image_path):
@@ -17,53 +17,42 @@ def predict_image(image_path):
         print(f"Loading model from: {pytorch_model_state_file}")
         predict_image.model_handler = ModelHandler(pytorch_model_state_file)
 
-    # Get numeric prediction (e.g. 0, 1, or 2).
-    numeric_pred = int(predict_image.model_handler.predict(image_path))
+    
+    pred_details = predict_image.model_handler.predict(image_path)
 
-    # Return the string label (or "Unknown" if out of range).
-    return model_lable_map.get(numeric_pred, "Unknown")
-
-
-def predict_image_with_confidence(image_path):
-    """
-    Lazy load the PyTorch model once in each executor (worker).
-    Then run inference and map the numeric class to a string label.
-    """
-    if not hasattr(predict_image, "model_handler"):
-        from pytorch_scripts.inference import ModelHandler
-
-        print(f"Loading model from: {pytorch_model_state_file}")
-        predict_image.model_handler = ModelHandler(pytorch_model_state_file)
 
     # Get numeric prediction (e.g. 0, 1, or 2).
-    numeric_pred, confidence_score = predict_image.model_handler.predict(
-        image_path, show_confidence=True
-    )
-    numeric_pred = int(numeric_pred)
-    label = model_lable_map.get(numeric_pred, "Unknown")
+    pred_class_id = int(pred_details.get("predicted_class",-1))
+    pred_label  = str(model_lable_map.get(pred_class_id, "Unknown"))
+    pred_class_confidence = float(pred_details.get("confidence", -1))
+    class_0_prob = float(pred_details.get("probabilities",[])[0])
+    class_1_prob = float(pred_details.get("probabilities",[])[1])
+    class_2_prob = float(pred_details.get("probabilities", [])[2])
 
-    return (label, float(confidence_score))
+    # if not get_details:
+    #     return pred_class, pred_label
+
+    # Return with details
+    return pred_label, pred_class_id, pred_class_confidence, class_0_prob, class_1_prob, class_2_prob
 
 
 # Start Spark Session
 spark = SparkSession.builder.appName("ImagePrediction").getOrCreate()
 
-# Register your Python function as a UDF returning String
-spark.udf.register(
-    "predict_image_udf",
-    lambda path: predict_image(os.path.join(images_dir, path)),
-    StringType(),
-)
 
 schema = StructType(
     [
-        StructField("label", StringType(), True),
-        StructField("confidence", FloatType(), True),
+        StructField("pred_label", StringType(), True),
+        StructField("pred_class_id", IntegerType(), True),
+        StructField("pred_class_confidence", FloatType(), True),
+        StructField("class_0_prob", FloatType(), True),
+        StructField("class_1_prob", FloatType(), True),
+        StructField("class_2_prob", FloatType(), True),
     ]
 )
 spark.udf.register(
-    "predict_image_with_confidence_udf",
-    lambda path: predict_image_with_confidence(os.path.join(images_dir, path)),
+    "predict_image",
+    lambda path: predict_image(os.path.join(images_dir, path)),
     schema,
 )
 
@@ -74,39 +63,17 @@ image_df = spark.read.csv(images_path_csv, header=True, inferSchema=True)
 image_df.createOrReplaceTempView("images")
 
 start = time.time()
-# Use Spark SQL to call the UDF
-predictions_df = spark.sql(
-    """
-    SELECT
-        image_path,
-        predict_image_udf(image_path) AS predicted_class
-    FROM images
-"""
-)
-
-print(f"query run time: {time.time() - start}")
+predictions_df = spark.sql(predication_detail_query)
+print(f"Prediction Details Query Time: {time.time() - start}")
 
 start = time.time()
-
-predictions_df_confidence = spark.sql(
-    """
-    SELECT
-        image_path,
-        pred.label AS predicted_class,
-        pred.confidence AS confidence_score
-    FROM (
-        SELECT 
-            image_path,
-            predict_image_with_confidence_udf(image_path) AS pred
-        FROM images
-    ) AS sub
-    """
-)
-
-print(f"query run time: {time.time() - start}")
+confusion_ma_df = spark.sql(confusion_matrix_query)
+print(f"Confusion Matrix Query Time: {time.time() - start}")
 
 # Show results
-predictions_df.show()
-predictions_df_confidence.show()
+predictions_df.orderBy(rand()).show(truncate=False, n=30)
+predictions_df.coalesce(1).write.mode("overwrite").option("header", True).csv("output_predictions")
+
+confusion_ma_df.show()
 
 spark.stop()
