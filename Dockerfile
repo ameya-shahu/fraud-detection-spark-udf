@@ -20,8 +20,15 @@ RUN curl -fsSL https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spar
 ENV SPARK_HOME=/opt/spark
 ENV PATH=$SPARK_HOME/bin:$SPARK_HOME/sbin:$PATH
 
-# Install pyspark
+# Download PostgreSQL JDBC driver
+ENV POSTGRES_JDBC_VERSION=42.7.3
+RUN mkdir -p $SPARK_HOME/jars && \
+    curl -o $SPARK_HOME/jars/postgresql-${POSTGRES_JDBC_VERSION}.jar \
+    https://jdbc.postgresql.org/download/postgresql-${POSTGRES_JDBC_VERSION}.jar
+
+# Install Python dependencies
 RUN pip install --upgrade pip && pip install pyspark onnx onnxruntime
+RUN pip install pandas
 
 # Set working directory
 WORKDIR /app
