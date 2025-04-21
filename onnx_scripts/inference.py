@@ -24,23 +24,22 @@ class ONNXModel:
         tensor = transform(image).unsqueeze(0).numpy()  # Convert to Numpy batch
         return tensor
 
-    # def predict(self, image_path):
-    #     input_data = self.preprocess(image_path)
-    #     outputs = self.session.run([self.output_name], {self.input_name: input_data})
-    #     prediction = np.argmax(outputs[0], axis=1)[0]
-    #     return prediction
+    
 
-    def predict(self, image_path, return_confidence=False):
+    def predict(self, image_path):
         input_data = self.preprocess(image_path)
         outputs = self.session.run([self.output_name], {self.input_name: input_data})
         logits = outputs[0]  # Shape: (1, num_classes)
 
-        predicted_class = int(np.argmax(logits, axis=1)[0])
+        # Apply softmax to get probabilities
+        exp_logits = np.exp(logits - np.max(logits, axis=1, keepdims=True))
+        probabilities = exp_logits / np.sum(exp_logits, axis=1, keepdims=True)
 
-        if return_confidence:
-            # Softmax over logits to get probabilities
-            exp_logits = np.exp(logits - np.max(logits, axis=1, keepdims=True))
-            probabilities = exp_logits / np.sum(exp_logits, axis=1, keepdims=True)
-            confidence_score = float(probabilities[0][predicted_class])
-            return predicted_class, confidence_score
-        return predicted_class
+        predicted_class = int(np.argmax(probabilities, axis=1)[0])
+        confidence = float(probabilities[0][predicted_class])
+
+        return {
+            "predicted_class": predicted_class,
+            "confidence": confidence,
+            "probabilities": probabilities[0].tolist()
+    }

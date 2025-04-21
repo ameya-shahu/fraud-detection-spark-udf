@@ -34,12 +34,12 @@ class ModelHandler:
 
 
     def predict(self, image_path: str):
-            probabilities = self.get_classes_probabilities(image_path)
-            predicted_class = torch.argmax(probabilities, dim=1).item()
-            confidence = probabilities[0][predicted_class].item()
+        probabilities = self.get_classes_probabilities(image_path)
+        predicted_class = torch.argmax(probabilities, dim=1).item()
+        confidence = probabilities[0][predicted_class].item()
 
-            return {
-                 "predicted_class": predicted_class,
-                 "confidence": confidence,
-                 "probabilities": probabilities[0].tolist()
-            }
+        return {
+                "predicted_class": predicted_class,
+                "confidence": confidence,
+                "probabilities": probabilities[0].tolist()
+        }

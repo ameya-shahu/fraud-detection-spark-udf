@@ -15,6 +15,8 @@ pytorch_model_state_file_name = 'id_classification_cnn_model.pth'
 onnx_model_state_file = os.path.join(MODEL_DIR, onnx_model_state_file_name)
 pytorch_model_state_file = os.path.join(MODEL_DIR, pytorch_model_state_file_name)
 
+default_backend = "pytorch"
+
 
 model_lable_map = {
         0: "crop_and_replace",
@@ -39,7 +41,7 @@ predication_detail_query = """
             image_path,
             actual_class,
             actual_class_id,
-            predict_image(image_path) AS pred
+            get_image_inference_udf(image_path, '{backend}') AS pred
         FROM images
     ) AS predictions
     """
@@ -55,7 +57,7 @@ FROM (
         image_path,
         actual_class,
         actual_class_id,
-        predict_image(image_path) AS pred
+        get_image_inference_udf(image_path, '{backend}') AS pred
     FROM images
 ) AS predictions
 """
