@@ -28,6 +28,7 @@ RUN mkdir -p $SPARK_HOME/jars && \
 
 # Install Python dependencies
 RUN pip install --upgrade pip && pip install pyspark onnx onnxruntime
+RUN pip install pandas
 
 # Set working directory
 WORKDIR /app
