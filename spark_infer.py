@@ -6,9 +6,21 @@ from pyspark.sql.types import StructType, StructField, StringType, FloatType, In
 from pyspark.sql.functions import rand
 from conf import pytorch_model_state_file, images_path_csv, images_dir, model_lable_map, predication_detail_query, confusion_matrix_query, onnx_model_state_file, default_backend
 
+import logging
+
+# Console-only logging configuration
+logging.basicConfig(
+    level=logging.INFO,  # Use logging.DEBUG for more details
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
+
 backend = default_backend
 if len(sys.argv) > 1:
     backend = sys.argv[1]
+
+logger.info(f"Backend runntime: {backend}")
 
 def predict_image(image_path, backend="pytorch"):
     """
@@ -22,14 +34,14 @@ def predict_image(image_path, backend="pytorch"):
     if backend == "onnx":
         if not hasattr(predict_image, "onnx_model"):
             from onnx_scripts.inference import ONNXModel
-            print(f"Loading onnx model from: {onnx_model_state_file}")
+            logger.info(f"Loading onnx model from: {onnx_model_state_file}")
             predict_image.onnx_model = ONNXModel(onnx_model_state_file)
         return predict_image.onnx_model.predict(image_path=image_path)
 
     elif backend == "pytorch":
         if not hasattr(predict_image, "pytorch_model"):
             from pytorch_scripts.inference import ModelHandler
-            print(f"Loading pytorch model from: {pytorch_model_state_file}")
+            logger.info(f"Loading pytorch model from: {pytorch_model_state_file}")
             predict_image.pytorch_model = ModelHandler(pytorch_model_state_file)
         return predict_image.pytorch_model.predict(image_path)
 
@@ -91,16 +103,20 @@ image_df.createOrReplaceTempView("images")
 
 start = time.time()
 predictions_df = spark.sql(predication_detail_query.format(backend=backend))
-print(f"Prediction Details Query Time: {time.time() - start}")
+prediction_end_time = time.time() - start
+
+predictions_df.coalesce(1).write.mode("overwrite").option("header", True).csv("output_predictions")
+
 
 start = time.time()
 confusion_ma_df = spark.sql(confusion_matrix_query.format(backend=backend))
-print(f"Confusion Matrix Query Time: {time.time() - start}")
+confusion_end_time = time.time() - start
+
 
 # Show results
 predictions_df.orderBy(rand()).show(truncate=False, n=30)
-predictions_df.coalesce(1).write.mode("overwrite").option("header", True).csv("output_predictions")
-
 confusion_ma_df.show()
+logger.info(f"Prediction Details Query Time: {prediction_end_time}")
+logger.info(f"Confusion Matrix Query Time: {confusion_end_time}")
 
 spark.stop()
