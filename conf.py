@@ -44,16 +44,16 @@ predication_detail_query = """
 
 confusion_matrix_query = """
 SELECT
-    SUM(CASE WHEN actual_class_id IN (0, 1) AND pred.pred_class_id IN (0, 1) THEN 1 ELSE 0 END) AS true_positives,
-    SUM(CASE WHEN actual_class_id = 2 AND pred.pred_class_id IN (0, 1) THEN 1 ELSE 0 END) AS false_positives,
-    SUM(CASE WHEN actual_class_id = 2 AND pred.pred_class_id = 2 THEN 1 ELSE 0 END) AS true_negatives,
-    SUM(CASE WHEN actual_class_id IN (0, 1) AND pred.pred_class_id = 2 THEN 1 ELSE 0 END) AS false_negatives
+    SUM(CASE WHEN actual_class_id = 1 AND pred.pred_class_id = 1 THEN 1 ELSE 0 END) AS non_valid_ID_Type_true_positives,
+    SUM(CASE WHEN actual_class_id = 0 AND pred.pred_class_id = 1 THEN 1 ELSE 0 END) AS non_valid_ID_Type_false_positives,
+    SUM(CASE WHEN actual_class_id = 0 AND pred.pred_class_id = 0 THEN 1 ELSE 0 END) AS non_valid_ID_Type_true_negatives,
+    SUM(CASE WHEN actual_class_id = 1 AND pred.pred_class_id = 0 THEN 1 ELSE 0 END) AS non_valid_ID_Type_false_negatives
 FROM (
     SELECT 
         image_path,
         actual_class,
         actual_class_id,
         get_image_inference_udf(image_path, '{backend}') AS pred
-    FROM images
+    FROM images WHERE actual_class_id IN (0,1)
 ) AS predictions
 """
