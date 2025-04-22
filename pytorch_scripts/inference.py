@@ -23,15 +23,14 @@ class ModelHandler:
         model.load_state_dict(torch.load(model_path, map_location="cpu"))
         model.eval()
         return model
-    
+
     def get_classes_probabilities(self, image_path: str):
         image = Image.open(image_path).convert("RGB")
         input_tensor = transform(image).unsqueeze(0)  # Add batch dimension
         with torch.no_grad():
             output = self.model(input_tensor)
-            probabilities = F.softmax(output, dim=1)  
+            probabilities = F.softmax(output, dim=1)
             return probabilities
-
 
     def predict(self, image_path: str):
         probabilities = self.get_classes_probabilities(image_path)
@@ -39,7 +38,7 @@ class ModelHandler:
         confidence = probabilities[0][predicted_class].item()
 
         return {
-                "predicted_class": predicted_class,
-                "confidence": confidence,
-                "probabilities": probabilities[0].tolist()
+            "predicted_class": predicted_class,
+            "confidence": confidence,
+            "probabilities": probabilities[0].tolist(),
         }
