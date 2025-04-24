@@ -10,3 +10,7 @@
 BACKEND TYPE can take two values - 
 1. onnx
 2. pytorch
+
+
+To run inference on simple python use folloeing command
+```docker run --rm -it --gpus all -v $(pwd):/app spark-cnn-runtime spark-cnn-runtime /app/python_infer.py```
